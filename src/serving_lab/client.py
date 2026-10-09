@@ -4,16 +4,16 @@ All timestamps are time.perf_counter() values in seconds.
 Glossary: TTFT = time to first token, ITL = inter-token latency,
 TPOT = time per output token (after the first).
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
+from itertools import pairwise
 
 
 @dataclass
 class RequestResult:
     """What happened to one request: raw timestamps, outcome, error."""
-
     t_send: float
     t_first: float | None = None
     t_tokens: list[float] = field(default_factory=list)
@@ -32,7 +32,7 @@ class RequestResult:
     def itl(self) -> list[float]:
         """Inter-token latency (s): gap between each pair of consecutive tokens. Empty if fewer than 2 tokens."""
         timestamp = self.t_tokens
-        return [b - a for a, b in zip(timestamp, timestamp[1:])]
+        return [b - a for a, b in pairwise(timestamp, timestamp[1:])]
 
     @property
     def e2e(self) -> float | None:
