@@ -7,7 +7,6 @@ TPOT = time per output token (after the first).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-
 from itertools import pairwise
 
 
