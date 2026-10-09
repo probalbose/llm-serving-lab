@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Serving Glossary</title>
+<style>
+  :root {
+    --bg: #f6f9f5;
+    --surface: #ffffff;
+    --ink: #1f2a24;
+    --muted: #5b6b62;
+    --line: #d9e4dc;
+    --sage: #8fb19a;
+    --sage-soft: #e6f0e8;
+    --blue: #9cc3dc;
+    --blue-soft: #e8f2f9;
+    --code: #f1f5f2;
+    --accent: #2f6b4f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    background: linear-gradient(135deg, var(--sage-soft), var(--blue-soft));
+    border-bottom: 1px solid var(--line);
+    padding: 28px 16px 20px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  header .wrap { padding: 0; }
+  h1 { margin: 0 0 6px; font-size: 1.7rem; }
+  header p { margin: 0; color: var(--muted); }
+  .controls {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    border-bottom: 1px solid var(--line); padding: 12px 0;
+  }
+  .controls .wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input[type=search] {
+    flex: 1 1 240px; padding: 9px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 15px; background: var(--surface); color: var(--ink);
+  }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav a {
+    font-size: 13px; text-decoration: none; color: var(--accent);
+    background: var(--sage-soft); border: 1px solid var(--line);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  nav a:hover { background: var(--blue-soft); }
+  section { margin: 28px 0; }
+  h2 {
+    font-size: 1.2rem; margin: 0 0 12px; padding-bottom: 6px;
+    border-bottom: 2px solid var(--sage);
+  }
+  article {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 4px solid var(--blue); border-radius: 8px;
+    padding: 14px 16px; margin: 10px 0;
+  }
+  article h3 { margin: 0; font-size: 1.05rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .short { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); }
+  .full { font-weight: 500; color: var(--ink); }
+  .what { margin: 8px 0 6px; }
+  .ex {
+    background: var(--code); border-radius: 6px; padding: 8px 12px;
+    font-size: 14.5px; margin-top: 6px;
+  }
+  .ex b { color: var(--accent); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: var(--code); padding: 1px 4px; border-radius: 4px; }
+  .ex code { background: #e4ece6; }
+  .see { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .hidden { display: none; }
+  #empty { color: var(--muted); padding: 20px 0; }
+  footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top: 1px solid var(--line); margin-top: 30px; }
+  @media (max-width: 600px) { h1 { font-size: 1.4rem; } article { padding: 12px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>LLM Serving Glossary</h1>
+    <p>Terms used in llm-serving-lab. They are standard across LLM inference, vLLM, llama.cpp and the monitoring stack. Each entry gives the short name, the full name, what it means and a worked example.</p>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="wrap">
+    <input type="search" id="q" placeholder="Filter terms, e.g. kv, p99, batch" aria-label="Filter terms">
+    <nav>
+      <a href="#metrics">Metrics</a>
+      <a href="#phases">Inference</a>
+      <a href="#memory">Memory</a>
+      <a href="#batching">Batching</a>
+      <a href="#hardware">Hardware</a>
+      <a href="#parallel">Parallelism</a>
+      <a href="#speedups">Speedups</a>
+      <a href="#load">Load testing</a>
+      <a href="#software">Software</a>
+      <a href="#observability">Observability</a>
+    </nav>
+  </div>
+</div>
+
+<main class="wrap">
+<p id="empty" class="hidden">No term matches that filter.</p>
+
+<!-- ============================================================ -->
+<section id="metrics">
+<h2>Latency and throughput metrics</h2>
+
+<article>
+  <h3><span class="short">TTFT</span><span class="full">Time To First Token</span></h3>
+  <p class="what">Time from sending the request until the first generated token arrives. It covers network, queueing and prefill, so it grows with prompt length and with load. For a chat user, this is how long the reply takes to start.</p>
+  <div class="ex"><b>Example:</b> sent at 0.000 s, first content chunk at 0.500 s, so TTFT = 500 ms. A 38-token prompt on the M4 Max took 271 ms of prefill on its own.</div>
+</article>
+
+<article>
+  <h3><span class="short">ITL</span><span class="full">Inter-Token Latency</span></h3>
+  <p class="what">The gap between each pair of consecutive output tokens, kept as a list. It shows individual stalls, so it is the metric for tail smoothness (p99). Users feel ITL as a stream that stutters or pauses.</p>
+  <div class="ex"><b>Example:</b> tokens at 0.500, 0.520, 0.540, 0.640 and 0.660 s give ITL = [20, 20, 100, 20] ms. The 100 ms stall is visible here but disappears in an average.</div>
+</article>
+
+<article>
+  <h3><span class="short">TPOT</span><span class="full">Time Per Output Token</span></h3>
+  <p class="what">One number per request: the mean decode time per token after the first, <code>(t_last − t_first) / (n − 1)</code>. It divides by n − 1 because n tokens have n − 1 gaps, and the first token's wait is already in TTFT. Its reciprocal is the token rate one user sees.</p>
+  <div class="ex"><b>Example:</b> (0.660 − 0.500) / 4 = 40 ms, which is 25 tok/s. llama-server reported <code>predicted_per_token_ms: 13.96</code>, so 1000 / 13.96 ≈ 72 tok/s.</div>
+  <p class="see">Some tools call this ITL; vLLM's benchmark reports both, so check which definition a number uses.</p>
+</article>
+
+<article>
+  <h3><span class="short">E2E</span><span class="full">End-to-End latency</span></h3>
+  <p class="what">Time from sending the request to receiving the last token: the whole wait. It decomposes as <code>E2E = TTFT + TPOT × (n − 1)</code>, so long answers are dominated by decode speed and short ones by TTFT.</p>
+  <div class="ex"><b>Example:</b> 500 + 40 × 4 = 660 ms. For a 500-token answer with TTFT = 300 ms and TPOT = 14 ms: 0.3 + 0.014 × 499 ≈ 7.3 s.</div>
+</article>
+
+<article>
+  <h3><span class="short">tok/s</span><span class="full">Throughput (output tokens per second)</span></h3>
+  <p class="what">Total tokens the server generates per second across all requests. It differs from per-user speed: batching raises total throughput while each user's TPOT gets slightly worse.</p>
+  <div class="ex"><b>Example:</b> 1 user at 72 tok/s = 72 tok/s total. 4 users at 55 tok/s each = 220 tok/s total. The server got 3× more productive while each user got about 25% slower.</div>
+</article>
+
+<article>
+  <h3><span class="short">RPS / QPS</span><span class="full">Requests (or Queries) Per Second</span></h3>
+  <p class="what">Request arrival rate, written λ (lambda) in queueing maths. It is the load you apply in a load test. For LLMs it means little without the prompt and output lengths, because one request can be 10 tokens or 10,000.</p>
+  <div class="ex"><b>Example:</b> 2 RPS of 200-token answers = 400 output tok/s needed. If the server peaks at 220 tok/s, the queue grows without bound.</div>
+</article>
+
+<article>
+  <h3><span class="short">Goodput</span><span class="full">Goodput (throughput that meets the SLO)</span></h3>
+  <p class="what">Requests per second that complete <em>and</em> meet every SLO target. Raw throughput can keep rising while latency gets unacceptable; goodput peaks and then falls. It is the honest capacity number.</p>
+  <div class="ex"><b>Example:</b> in 60 s, 100 requests complete but only 80 meet TTFT &lt; 500 ms and TPOT &lt; 50 ms. Throughput = 1.67 req/s, goodput = 1.33 req/s.</div>
+</article>
+
+<article>
+  <h3><span class="short">SLI / SLO / SLA</span><span class="full">Service Level Indicator / Objective / Agreement</span></h3>
+  <p class="what">SLI is the thing you measure, SLO is the internal target for it, and SLA is the external promise with consequences. The SLO is usually stricter than the SLA so you get warned before breaching it.</p>
+  <div class="ex"><b>Example:</b> SLI = p95 TTFT. SLO = p95 TTFT &lt; 500 ms over 28 days. SLA = p95 TTFT &lt; 1 s or the customer gets credits.</div>
+</article>
+
+<article>
+  <h3><span class="short">p50 / p95 / p99</span><span class="full">Percentiles (50th, 95th, 99th)</span></h3>
+  <p class="what">The value below which 50%, 95% or 99% of observations fall. p50 is the typical case; p99 is the tail that one in a hundred users hits. Latency SLOs use percentiles because means hide the tail.</p>
+  <div class="ex"><b>Example:</b> 100 TTFTs sorted, p99 is roughly the 99th value. If 98 are 300 ms and 2 are 4 s, the mean is 374 ms (looks fine) but p99 = 4 s.</div>
+</article>
+
+<article>
+  <h3><span class="short">Error budget</span><span class="full">Error budget</span></h3>
+  <p class="what">The amount of SLO failure you are allowed: 1 − SLO target. When it is spent, risky changes stop until reliability recovers.</p>
+  <div class="ex"><b>Example:</b> 99.5% of requests must meet the TTFT SLO. At 1 M requests per month, the budget is 5,000 slow or failed requests.</div>
+</article>
+
+<article>
+  <h3><span class="short">Knee</span><span class="full">Latency knee (saturation point)</span></h3>
+  <p class="what">The load where latency stops being flat and starts climbing steeply, because the server is saturated and requests queue. Safe operating load sits below the knee with headroom.</p>
+  <div class="ex"><b>Example:</b> llama-server has <code>n_slots = 4</code>. Expect TTFT to stay roughly flat up to 4 concurrent requests, then jump once new requests have to wait for a free slot. Stage 2 measures where it actually happens.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="phases">
+<h2>How inference works</h2>
+
+<article>
+  <h3><span class="short">Token</span><span class="full">Token</span></h3>
+  <p class="what">The unit a model reads and writes: a word piece produced by the tokenizer. Prices, context limits and speed are all counted in tokens, not characters or words.</p>
+  <div class="ex"><b>Example:</b> in English, 1 token ≈ 0.75 words, about 4 characters. "Explain a KV cache in 3 sentences" plus the chat template became 38 prompt tokens.</div>
+</article>
+
+<article>
+  <h3><span class="short">Prefill</span><span class="full">Prefill (prompt processing)</span></h3>
+  <p class="what">The first phase: the model processes all prompt tokens in parallel in one forward pass and fills the KV cache. It is compute-bound (big matrix multiplies) and sets most of TTFT.</p>
+  <div class="ex"><b>Example:</b> a 4,000-token prompt prefills much faster per token than a 38-token one, because the GPU can use its compute fully. Prefill time still grows roughly linearly with prompt length.</div>
+</article>
+
+<article>
+  <h3><span class="short">Decode</span><span class="full">Decode (generation)</span></h3>
+  <p class="what">The second phase: tokens are generated one at a time, each needing a full pass over the weights. It is memory-bandwidth-bound, because every step reads all weights to produce one token per sequence.</p>
+  <div class="ex"><b>Example:</b> Qwen2.5-7B Q4_K_M is about 4.7 GB. At 410 GB/s the ceiling is about 410 / 4.7 ≈ 87 tok/s; we measured 72 tok/s, about 82% of the limit.</div>
+</article>
+
+<article>
+  <h3><span class="short">Autoregressive</span><span class="full">Autoregressive generation</span></h3>
+  <p class="what">Each new token depends on all previous tokens, so generation is inherently sequential within one request. This is why decode can't be parallelised across a single answer and why batching across requests matters.</p>
+  <div class="ex"><b>Example:</b> to write token 5, the model must already have tokens 1 to 4. 200 tokens means 200 sequential decode steps.</div>
+</article>
+
+<article>
+  <h3><span class="short">Logits / sampling</span><span class="full">Logits and sampling (temperature, top-p, top-k)</span></h3>
+  <p class="what">The model outputs a score (logit) for every vocabulary token; sampling turns these into a choice. Temperature sharpens or flattens the distribution, top-k keeps the k best, top-p keeps the smallest set whose probability sums to p.</p>
+  <div class="ex"><b>Example:</b> temperature 0 always picks the top token (deterministic, good for benchmarks). Temperature 0.8 with top_p 0.95 gives varied text. Use temperature 0 or a fixed seed when comparing runs.</div>
+</article>
+
+<article>
+  <h3><span class="short">n_ctx</span><span class="full">Context window / context length</span></h3>
+  <p class="what">The maximum number of tokens (prompt plus output) a sequence can hold. Longer context costs KV cache memory linearly and attention compute more than linearly.</p>
+  <div class="ex"><b>Example:</b> llama-server logged <code>n_ctx_slot = 32768</code>: each of its 4 slots can hold a 32k-token conversation.</div>
+</article>
+
+<article>
+  <h3><span class="short">max_tokens</span><span class="full">Maximum output tokens</span></h3>
+  <p class="what">Request parameter capping how many tokens the server will generate. Generation stops at this cap or at an end-of-sequence token, whichever comes first (<code>finish_reason</code> = "length" or "stop").</p>
+  <div class="ex"><b>Example:</b> <code>max_tokens: 256</code> with a model that wants to write 400 tokens returns 256 and <code>finish_reason: "length"</code>. Benchmarks often fix output length so runs are comparable.</div>
+</article>
+
+<article>
+  <h3><span class="short">Chat template</span><span class="full">Chat template</span></h3>
+  <p class="what">The model-specific text format that wraps messages with role markers before tokenizing. The server applies it, which is why the prompt token count is larger than your message.</p>
+  <div class="ex"><b>Example:</b> Qwen wraps a user message as <code>&lt;|im_start|&gt;user … &lt;|im_end|&gt;</code> plus a default system prompt, turning 7 words into 38 tokens.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="memory">
+<h2>Memory: weights, KV cache, quantisation</h2>
+
+<article>
+  <h3><span class="short">KV cache</span><span class="full">Key-Value cache</span></h3>
+  <p class="what">Stored attention keys and values for every token already processed, so decode doesn't recompute them. It grows with tokens × concurrent sequences and is usually what limits how many requests fit on a GPU. Size per token = 2 × layers × KV heads × head dim × bytes per value.</p>
+  <div class="ex"><b>Example:</b> Qwen2.5-7B has 28 layers, 4 KV heads, head dim 128. In fp16: 2 × 28 × 4 × 128 × 2 B = 57,344 B ≈ 56 KB per token. One 32k-token sequence ≈ 1.8 GB; four of them ≈ 7.3 GB.</div>
+</article>
+
+<article>
+  <h3><span class="short">GQA / MQA</span><span class="full">Grouped-Query / Multi-Query Attention</span></h3>
+  <p class="what">Attention variants where several query heads share one key/value head. Fewer KV heads means a much smaller KV cache and less memory traffic during decode, with little quality loss.</p>
+  <div class="ex"><b>Example:</b> Qwen2.5-7B has 28 query heads but only 4 KV heads, so its KV cache is 7× smaller than full multi-head attention would need.</div>
+</article>
+
+<article>
+  <h3><span class="short">PagedAttention</span><span class="full">PagedAttention (paged KV cache)</span></h3>
+  <p class="what">vLLM's core idea: store the KV cache in fixed-size blocks, like OS memory pages, instead of one contiguous buffer per request. It removes fragmentation, so far more sequences fit and blocks can be shared between requests.</p>
+  <div class="ex"><b>Example:</b> with block size 16, a 1,000-token sequence uses 63 blocks and wastes at most 15 token slots. A contiguous pre-allocation of 32k tokens would waste 31k.</div>
+</article>
+
+<article>
+  <h3><span class="short">Prefix caching</span><span class="full">Automatic prefix caching</span></h3>
+  <p class="what">Reusing KV cache blocks when a new request starts with the same tokens as an earlier one, so that part of prefill is skipped. Big wins for shared system prompts, few-shot examples and multi-turn chat.</p>
+  <div class="ex"><b>Example:</b> 1,000 requests share a 2,000-token system prompt. With prefix caching only the first pays that prefill; the rest start from cache and TTFT drops sharply. llama.cpp shows this as <code>cache_n</code> in its timings.</div>
+</article>
+
+<article>
+  <h3><span class="short">gpu_memory_utilization</span><span class="full">vLLM GPU memory fraction</span></h3>
+  <p class="what">Fraction of GPU memory vLLM may use (default 0.9). After loading weights, the remainder becomes KV cache, which caps how many sequences can run at once.</p>
+  <div class="ex"><b>Example:</b> L4 with 24 GB × 0.9 = 21.6 GB. A 7B model in fp16 takes about 15 GB, leaving roughly 6 GB of KV cache, about 110k tokens at 56 KB each.</div>
+</article>
+
+<article>
+  <h3><span class="short">Quantisation</span><span class="full">Quantisation (INT8, INT4, FP8)</span></h3>
+  <p class="what">Storing weights (and sometimes the KV cache) in fewer bits. Smaller weights mean less memory and less data to read per decode step, so decode gets faster, at some cost in quality.</p>
+  <div class="ex"><b>Example:</b> a 7B model is about 14 GB in fp16 (2 bytes per parameter) and about 4.7 GB in Q4_K_M (about 4.8 bits per parameter). Decode ceiling at 410 GB/s goes from about 29 to about 87 tok/s.</div>
+</article>
+
+<article>
+  <h3><span class="short">GGUF / Q4_K_M</span><span class="full">GGUF file format / 4-bit K-quant, medium</span></h3>
+  <p class="what">GGUF is llama.cpp's single-file model format holding weights, tokenizer and metadata. Q4_K_M is one of its quantisation schemes: mostly 4-bit blocks with some layers kept at higher precision, a common quality and size balance.</p>
+  <div class="ex"><b>Example:</b> <code>bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M</code> is the 7B Qwen instruct model, quantised to Q4_K_M, from the "bartowski" Hugging Face repo.</div>
+  <p class="see">GPU servers like vLLM usually use AWQ, GPTQ or FP8 checkpoints instead of GGUF.</p>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="batching">
+<h2>Batching and scheduling</h2>
+
+<article>
+  <h3><span class="short">Batch size</span><span class="full">Batch size (concurrent sequences)</span></h3>
+  <p class="what">How many sequences the server advances together in one forward pass. Decode reads the weights once per step regardless of batch size, so batching multiplies throughput almost for free until compute or KV memory runs out.</p>
+  <div class="ex"><b>Example:</b> one step reads 4.7 GB of weights. At batch 1 that yields 1 token; at batch 8 it yields 8 tokens for nearly the same time.</div>
+</article>
+
+<article>
+  <h3><span class="short">Static batching</span><span class="full">Static (request-level) batching</span></h3>
+  <p class="what">Collect a batch, run it until every sequence finishes, then start the next batch. Short answers wait for the longest one, and new arrivals wait for the whole batch, so GPU time is wasted.</p>
+  <div class="ex"><b>Example:</b> a batch has answers of 20 and 500 tokens. The 20-token request finishes early, but its slot sits idle for 480 more steps.</div>
+</article>
+
+<article>
+  <h3><span class="short">Continuous batching</span><span class="full">Continuous (iteration-level) batching</span></h3>
+  <p class="what">The scheduler re-forms the batch on every decode step: finished sequences leave immediately and waiting requests join. This is how vLLM, TGI and llama.cpp (with slots) keep the GPU busy.</p>
+  <div class="ex"><b>Example:</b> the 20-token request leaves at step 20 and a queued request takes its place at step 21. Throughput can be several times higher than static batching.</div>
+</article>
+
+<article>
+  <h3><span class="short">max_num_seqs</span><span class="full">vLLM maximum concurrent sequences</span></h3>
+  <p class="what">vLLM's cap on sequences running in one batch. Higher raises throughput but each step takes longer, so TPOT rises; beyond the KV cache limit, sequences get preempted.</p>
+  <div class="ex"><b>Example:</b> sweeping <code>max_num_seqs</code> over 8, 32, 128 and 256 while measuring goodput is one of the Stage 4 experiments.</div>
+</article>
+
+<article>
+  <h3><span class="short">max_num_batched_tokens</span><span class="full">vLLM token budget per step</span></h3>
+  <p class="what">The maximum number of tokens (prefill plus decode) processed in one scheduler step. It bounds how much prefill can be squeezed in alongside decodes, trading TTFT against ITL.</p>
+  <div class="ex"><b>Example:</b> budget 2,048 with 64 decoding sequences leaves room for 1,984 prefill tokens in that step.</div>
+</article>
+
+<article>
+  <h3><span class="short">Chunked prefill</span><span class="full">Chunked prefill</span></h3>
+  <p class="what">Splitting a long prompt's prefill into chunks spread across several steps, mixed in with ongoing decodes. Without it, one long prompt stalls every other user's next token.</p>
+  <div class="ex"><b>Example:</b> a 16k-token prompt arrives. Unchunked, all running streams freeze for about a second (an ITL spike). Chunked into 2k-token pieces, they slow slightly over 8 steps instead.</div>
+</article>
+
+<article>
+  <h3><span class="short">Slot</span><span class="full">llama.cpp server slot</span></h3>
+  <p class="what">llama-server's fixed number of parallel sequences (<code>-np</code> / <code>--parallel</code>), each with its own context. Requests beyond the slot count wait in a queue.</p>
+  <div class="ex"><b>Example:</b> our run showed <code>n_slots = 4</code>. A 5th concurrent request queues until a slot frees, which shows up as extra TTFT.</div>
+</article>
+
+<article>
+  <h3><span class="short">Preemption</span><span class="full">Preemption (swap or recompute)</span></h3>
+  <p class="what">When the KV cache fills, the scheduler evicts a running sequence and later swaps its cache back or recomputes it. It keeps the server alive but causes large latency spikes for the victim.</p>
+  <div class="ex"><b>Example:</b> vLLM logs a preemption warning and the metric <code>vllm:num_preemptions_total</code> rises. A sustained rise means too much concurrency for the KV memory.</div>
+</article>
+
+<article>
+  <h3><span class="short">HOL blocking</span><span class="full">Head-of-line blocking</span></h3>
+  <p class="what">A slow item at the front of a queue delays everything behind it. In LLM serving it is typically one huge prompt or a long generation holding resources others need.</p>
+  <div class="ex"><b>Example:</b> a 30k-token prompt arrives first; ten short chat requests behind it all see multi-second TTFT. Chunked prefill and fair scheduling reduce this.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="hardware">
+<h2>Hardware and performance limits</h2>
+
+<article>
+  <h3><span class="short">Memory bandwidth</span><span class="full">Memory bandwidth (HBM / unified memory)</span></h3>
+  <p class="what">Bytes per second the processor can read from memory. It sets the decode ceiling: tokens per second per sequence ≤ bandwidth ÷ bytes read per step (mostly the weights).</p>
+  <div class="ex"><b>Example:</b> M4 Max (36 GB) about 410 GB/s, L4 about 300 GB/s, H100 SXM about 3.35 TB/s. A 7B fp16 model (14 GB) on H100: 3,350 / 14 ≈ 240 tok/s ceiling at batch 1.</div>
+</article>
+
+<article>
+  <h3><span class="short">FLOPS</span><span class="full">Floating-point operations per second</span></h3>
+  <p class="what">Compute throughput. A forward pass costs about 2 FLOPs per parameter per token, which sets the prefill ceiling.</p>
+  <div class="ex"><b>Example:</b> 7B model, 4,000-token prompt: 2 × 7e9 × 4,000 = 5.6e13 FLOPs. On an H100 at about 989 TFLOPS dense BF16 that is about 57 ms at 100% efficiency; real-world is perhaps 2 to 3× that.</div>
+</article>
+
+<article>
+  <h3><span class="short">AI</span><span class="full">Arithmetic intensity</span></h3>
+  <p class="what">FLOPs performed per byte moved from memory. Low intensity means memory-bound; high means compute-bound. The crossover is the hardware's ridge point = peak FLOPS ÷ bandwidth.</p>
+  <div class="ex"><b>Example:</b> decode at batch 1 in fp16: about 2 FLOPs per 2 bytes, intensity ≈ 1. H100 ridge ≈ 989e12 / 3.35e12 ≈ 295. So decode is far below the ridge (memory-bound), and batching raises intensity roughly in proportion to batch size.</div>
+</article>
+
+<article>
+  <h3><span class="short">Roofline</span><span class="full">Roofline model</span></h3>
+  <p class="what">A plot of achievable performance against arithmetic intensity: a sloped "memory roof" then a flat "compute roof". It tells you which resource limits a workload and how far you are from the ceiling.</p>
+  <div class="ex"><b>Example:</b> our decode run hit 72 of a possible 87 tok/s on the memory roof, 82% efficiency, so the remaining gain from software tuning at batch 1 is small.</div>
+</article>
+
+<article>
+  <h3><span class="short">MBU / MFU</span><span class="full">Model Bandwidth Utilisation / Model FLOPs Utilisation</span></h3>
+  <p class="what">Achieved bandwidth or FLOPS as a fraction of hardware peak. MBU is the right efficiency number for decode, MFU for prefill and training.</p>
+  <div class="ex"><b>Example:</b> MBU = (4.7 GB × 72 tok/s) / 410 GB/s ≈ 83%. That's a good number to quote with the hardware named.</div>
+</article>
+
+<article>
+  <h3><span class="short">Memory-bound vs compute-bound</span><span class="full">Memory-bound vs compute-bound</span></h3>
+  <p class="what">Whether a workload waits on data movement or on arithmetic. Decode at small batch is memory-bound; prefill and large-batch decode are compute-bound. The fix differs: quantise or batch for memory-bound, faster kernels or more GPUs for compute-bound.</p>
+  <div class="ex"><b>Example:</b> doubling batch size from 1 to 2 nearly doubles decode throughput (memory-bound). Doubling prompt length nearly doubles prefill time (compute-bound).</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="parallel">
+<h2>Parallelism across GPUs</h2>
+
+<article>
+  <h3><span class="short">TP</span><span class="full">Tensor Parallelism</span></h3>
+  <p class="what">Split each layer's weight matrices across GPUs; every GPU computes part of every layer and they exchange results each layer. It cuts per-GPU memory and latency but needs fast interconnect (NVLink).</p>
+  <div class="ex"><b>Example:</b> a 70B fp16 model (140 GB) doesn't fit on one 80 GB H100. With <code>--tensor-parallel-size 2</code> each GPU holds about 70 GB of weights.</div>
+</article>
+
+<article>
+  <h3><span class="short">PP</span><span class="full">Pipeline Parallelism</span></h3>
+  <p class="what">Split the model by layers: GPU 1 runs layers 1 to 40, GPU 2 runs 41 to 80. Less communication than TP, so it works across nodes, but each request passes through stages in sequence.</p>
+  <div class="ex"><b>Example:</b> a model too large for one 8-GPU node runs with TP 8 inside each node and PP 2 across two nodes.</div>
+</article>
+
+<article>
+  <h3><span class="short">DP</span><span class="full">Data Parallelism (replicas)</span></h3>
+  <p class="what">Run independent full copies of the model and load-balance requests between them. Throughput scales linearly; per-request latency doesn't change. This is the usual way to scale serving horizontally.</p>
+  <div class="ex"><b>Example:</b> one replica sustains 3 req/s within SLO. To serve 10 req/s with headroom, run 4 replicas behind a load balancer.</div>
+</article>
+
+<article>
+  <h3><span class="short">EP / MoE</span><span class="full">Expert Parallelism / Mixture of Experts</span></h3>
+  <p class="what">MoE models have many expert sub-networks but route each token to only a few, so compute per token is small while total weights are large. EP places different experts on different GPUs.</p>
+  <div class="ex"><b>Example:</b> a model with 8 experts and top-2 routing has all 8 experts' weights in memory but runs only 2 per token, about a quarter of the expert compute.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="speedups">
+<h2>Decoding speedups</h2>
+
+<article>
+  <h3><span class="short">Spec decoding</span><span class="full">Speculative decoding</span></h3>
+  <p class="what">A small draft model (or n-gram lookup) proposes several tokens; the large model verifies them all in one forward pass and keeps the accepted prefix. Output is identical to normal decoding, but fewer expensive steps are needed when guesses are good.</p>
+  <div class="ex"><b>Example:</b> the draft proposes 4 tokens and 3 are accepted, so one big-model pass yields 4 tokens (3 accepted plus 1 corrected) instead of 1.</div>
+</article>
+
+<article>
+  <h3><span class="short">Acceptance rate</span><span class="full">Speculative acceptance rate</span></h3>
+  <p class="what">Fraction of draft tokens the target model accepts. Speed-up depends on it: low acceptance wastes draft compute and can make things slower, especially at high batch sizes where the GPU is already busy.</p>
+  <div class="ex"><b>Example:</b> 70% acceptance on code completion gives a clear win; 30% on creative writing may be slower than no speculation.</div>
+</article>
+
+<article>
+  <h3><span class="short">FlashAttention</span><span class="full">FlashAttention</span></h3>
+  <p class="what">An attention kernel that computes attention in tiles held in fast on-chip memory, never writing the full attention matrix to HBM. Same result, far less memory traffic, which matters most for long prompts.</p>
+  <div class="ex"><b>Example:</b> for a 32k-token prompt the full attention matrix per head would be 32k × 32k; FlashAttention never materialises it, so long-context prefill gets much faster and fits in memory.</div>
+</article>
+
+<article>
+  <h3><span class="short">CUDA graphs</span><span class="full">CUDA graphs</span></h3>
+  <p class="what">Recording a sequence of GPU kernel launches once and replaying it, removing CPU launch overhead. It matters for decode, where each step is small and launch overhead can dominate.</p>
+  <div class="ex"><b>Example:</b> vLLM captures graphs for common batch sizes at startup (this is part of its warm-up time). <code>--enforce-eager</code> disables them, useful for debugging but slower.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="load">
+<h2>Load testing and queueing</h2>
+
+<article>
+  <h3><span class="short">Closed-loop</span><span class="full">Closed-loop load generator</span></h3>
+  <p class="what">N virtual users, each sending the next request only after the previous one finishes. When the server slows down, the load automatically drops, so it hides overload and underestimates latency.</p>
+  <div class="ex"><b>Example:</b> 10 users. If latency rises from 1 s to 5 s, the offered load silently drops from 10 to 2 req/s.</div>
+</article>
+
+<article>
+  <h3><span class="short">Open-loop</span><span class="full">Open-loop load generator</span></h3>
+  <p class="what">Requests are sent on a schedule regardless of whether earlier ones finished, like real users who don't coordinate. This is the correct way to find the knee. Stage 2 builds one.</p>
+  <div class="ex"><b>Example:</b> send at 5 req/s for 60 s. If the server can only do 3 req/s, the backlog grows and latency rises without limit, which is exactly what you need to see.</div>
+</article>
+
+<article>
+  <h3><span class="short">Poisson arrivals</span><span class="full">Poisson arrival process</span></h3>
+  <p class="what">Arrivals that are independent and random at a constant average rate λ; the gaps between them are exponentially distributed with mean 1/λ. It's the standard model of many independent users.</p>
+  <div class="ex"><b>Example:</b> λ = 4 req/s gives a mean gap of 250 ms. In Python: <code>random.expovariate(4.0)</code> for each gap.</div>
+</article>
+
+<article>
+  <h3><span class="short">CO</span><span class="full">Coordinated omission</span></h3>
+  <p class="what">A measurement bug where the load generator waits for slow responses before sending more, so it never records the requests that would have been delayed. Tail latencies look far better than reality.</p>
+  <div class="ex"><b>Example:</b> the server stalls for 2 s. A closed-loop client records one 2 s request. At a real 10 req/s, 20 requests would have arrived during the stall, with waits from 0 to 2 s.</div>
+</article>
+
+<article>
+  <h3><span class="short">Little's Law</span><span class="full">Little's Law: L = λ × W</span></h3>
+  <p class="what">In a stable system, average number in the system (L) = arrival rate (λ) × average time each spends in it (W). It links concurrency, throughput and latency with no assumptions about distributions.</p>
+  <div class="ex"><b>Example:</b> 0.6 req/s with an average E2E of 7 s means about 4.2 requests in flight. With only 4 slots, a queue must form.</div>
+</article>
+
+<article>
+  <h3><span class="short">ρ</span><span class="full">Utilisation (rho)</span></h3>
+  <p class="what">Fraction of capacity in use, λ ÷ service rate. Queueing delay grows like 1 / (1 − ρ), so it explodes as utilisation approaches 100%. This is why SREs keep headroom.</p>
+  <div class="ex"><b>Example:</b> at ρ = 0.5 queueing adds about 1× the service time; at 0.9 about 9×; at 0.99 about 99×.</div>
+</article>
+
+<article>
+  <h3><span class="short">Warm-up</span><span class="full">Warm-up period</span></h3>
+  <p class="what">Initial requests excluded from results because caches, kernels and graphs are still initialising. Including them distorts the numbers.</p>
+  <div class="ex"><b>Example:</b> our first llama-server request prefilled at 140 tok/s, which is cold-start speed. Discard the first 10 to 30 s of a run.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="software">
+<h2>Serving software and protocols</h2>
+
+<article>
+  <h3><span class="short">vLLM</span><span class="full">vLLM inference engine</span></h3>
+  <p class="what">Open-source, high-throughput GPU inference server built around PagedAttention and continuous batching, with an OpenAI-compatible API and Prometheus metrics. The usual reference for production open-model serving.</p>
+  <div class="ex"><b>Example:</b> <code>vllm serve Qwen/Qwen2.5-7B-Instruct --max-num-seqs 64</code> serves on port 8000 with metrics at <code>/metrics</code>.</div>
+</article>
+
+<article>
+  <h3><span class="short">llama.cpp</span><span class="full">llama.cpp / llama-server</span></h3>
+  <p class="what">C/C++ inference engine optimised for CPUs and Apple Silicon (Metal), using GGUF models. <code>llama-server</code> is its HTTP server with an OpenAI-compatible API and slot-based concurrency.</p>
+  <div class="ex"><b>Example:</b> <code>llama-server -hf bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M --port 8080</code>, our local baseline.</div>
+</article>
+
+<article>
+  <h3><span class="short">MLX</span><span class="full">Apple MLX</span></h3>
+  <p class="what">Apple's array framework for Apple Silicon, using unified memory. <code>mlx-lm</code> runs and serves LLMs on a Mac, often faster than llama.cpp for some models.</p>
+  <div class="ex"><b>Example:</b> comparing llama.cpp and MLX on the same model and quantisation on the M4 Max is a fair engine-versus-engine test.</div>
+</article>
+
+<article>
+  <h3><span class="short">SGLang / TGI / TRT-LLM</span><span class="full">SGLang, Text Generation Inference, TensorRT-LLM</span></h3>
+  <p class="what">Other production inference servers. SGLang is strong on prefix reuse (RadixAttention), TGI is Hugging Face's server, and TensorRT-LLM is NVIDIA's compiled, highly optimised engine.</p>
+  <div class="ex"><b>Example:</b> an interviewer may ask why you'd choose one over another: think throughput, hardware support, operational simplicity and features like structured output.</div>
+</article>
+
+<article>
+  <h3><span class="short">OpenAI-compatible API</span><span class="full">OpenAI-compatible chat completions API</span></h3>
+  <p class="what">The de-facto HTTP interface: POST to <code>/v1/chat/completions</code> with a <code>messages</code> list. Because vLLM, llama.cpp and others all implement it, one client can benchmark them all.</p>
+  <div class="ex"><b>Example:</b> <code>{"messages":[{"role":"user","content":"hi"}],"stream":true,"max_tokens":256}</code></div>
+</article>
+
+<article>
+  <h3><span class="short">SSE</span><span class="full">Server-Sent Events</span></h3>
+  <p class="what">A simple HTTP streaming format: the server keeps the response open and sends lines starting with <code>data: </code>, separated by blank lines. LLM servers use it to stream tokens as they are generated.</p>
+  <div class="ex"><b>Example:</b> <code>data: {"choices":[{"delta":{"content":"KV"}}]}</code> … then <code>data: [DONE]</code>. The first chunk often has only <code>{"role":"assistant"}</code> and the last has <code>delta: {}</code>; neither is a token.</div>
+</article>
+
+<article>
+  <h3><span class="short">Chunk</span><span class="full">Stream chunk (SSE event)</span></h3>
+  <p class="what">One <code>data:</code> event in the stream. It usually carries one token's text, but servers may merge several tokens or send empty chunks, so chunk count is not token count.</p>
+  <div class="ex"><b>Example:</b> 71 tokens generated may arrive as 71 chunks on llama.cpp but fewer on a server that batches output. Use <code>usage.completion_tokens</code> for the true count.</div>
+</article>
+
+<article>
+  <h3><span class="short">finish_reason</span><span class="full">Finish reason</span></h3>
+  <p class="what">Why generation ended: <code>"stop"</code> (end-of-sequence or stop string), <code>"length"</code> (hit max_tokens) or an error. Benchmarks should check it, because a run full of early stops measures something different.</p>
+  <div class="ex"><b>Example:</b> our curl run ended with <code>"finish_reason":"stop"</code> after 71 tokens.</div>
+</article>
+</section>
+
+<!-- ============================================================ -->
+<section id="observability">
+<h2>Observability</h2>
+
+<article>
+  <h3><span class="short">Prometheus</span><span class="full">Prometheus</span></h3>
+  <p class="what">Time-series monitoring system that scrapes <code>/metrics</code> endpoints on an interval and stores counters, gauges and histograms, queried with PromQL.</p>
+  <div class="ex"><b>Example:</b> scrape vLLM every 5 s; alert when p95 TTFT over 5 minutes exceeds the SLO.</div>
+</article>
+
+<article>
+  <h3><span class="short">Histogram</span><span class="full">Prometheus histogram</span></h3>
+  <p class="what">Counts of observations in fixed buckets, which can be summed across servers and turned into approximate percentiles. Percentile accuracy depends on bucket boundaries.</p>
+  <div class="ex"><b>Example:</b> <code>histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m])))</code> gives fleet-wide p95 TTFT.</div>
+</article>
+
+<article>
+  <h3><span class="short">vLLM metrics</span><span class="full">Key vLLM server metrics</span></h3>
+  <p class="what">vLLM exports, among others: TTFT and per-token latency histograms, running and waiting request counts, KV cache usage and preemptions. Names change between versions, so check <code>/metrics</code> on your build.</p>
+  <div class="ex"><b>Example:</b> <code>vllm:num_requests_waiting</code> rising while KV cache usage sits near 100% means you are memory-limited: lower <code>max_num_seqs</code>, quantise or add replicas.</div>
+</article>
+
+<article>
+  <h3><span class="short">DCGM</span><span class="full">NVIDIA Data Center GPU Manager</span></h3>
+  <p class="what">NVIDIA's GPU telemetry; <code>dcgm-exporter</code> exposes it to Prometheus. Key signals: GPU utilisation, memory used, SM activity, power, temperature, XID errors.</p>
+  <div class="ex"><b>Example:</b> "GPU util 100%" only means a kernel was running; SM activity and tensor-core activity show whether it was doing useful work.</div>
+</article>
+
+<article>
+  <h3><span class="short">Client vs server metrics</span><span class="full">Client-side vs server-side measurement</span></h3>
+  <p class="what">The server measures from when it received the request; the client measures what the user experienced, including network, TLS, load balancer and queueing in front of the server. SLOs should be judged on the client view.</p>
+  <div class="ex"><b>Example:</b> if the server reports 271 ms of prefill but your client measures 310 ms TTFT, the 39 ms gap is HTTP, queueing and tokenisation that server metrics cannot see. Stage 1 prints both so you can measure the real gap.</div>
+</article>
+</section>
+</main>
+
+<div class="wrap">
+<footer>
+  To add a term, copy an <code>&lt;article&gt;</code> block into the right section: short name, full name, what it means, worked example. Hardware figures are approximate vendor specs; measured numbers come from this repo's runs on an M4 Max.
+</footer>
+</div>
+
+<script>
+  (function () {
+    var q = document.getElementById('q');
+    var empty = document.getElementById('empty');
+    q.addEventListener('input', function () {
+      var term = q.value.trim().toLowerCase();
+      var shown = 0;
+      document.querySelectorAll('section').forEach(function (sec) {
+        var any = 0;
+        sec.querySelectorAll('article').forEach(function (a) {
+          var hit = !term || a.textContent.toLowerCase().indexOf(term) !== -1;
+          a.classList.toggle('hidden', !hit);
+          if (hit) any++;
+        });
+        sec.classList.toggle('hidden', any === 0);
+        shown += any;
+      });
+      empty.classList.toggle('hidden', shown !== 0);
+    });
+  })();
+</script>
+</body>
+</html>
