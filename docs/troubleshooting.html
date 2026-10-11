@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting Commands</title>
+<style>
+  :root {
+    --bg: #f6f9f5; --surface: #ffffff; --ink: #1f2a24; --muted: #5b6b62;
+    --line: #d9e4dc; --sage: #8fb19a; --sage-soft: #e6f0e8;
+    --blue: #9cc3dc; --blue-soft: #e8f2f9; --code-bg: #1f2a24; --code-ink: #e8f2ea;
+    --accent: #2f6b4f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { background: linear-gradient(135deg, var(--sage-soft), var(--blue-soft));
+    border-bottom: 1px solid var(--line); padding: 28px 16px 20px; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  header .wrap { padding: 0; }
+  h1 { margin: 0 0 6px; font-size: 1.7rem; }
+  header p { margin: 0; color: var(--muted); }
+  nav { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 10px 0; }
+  nav .wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav a { font-size: 13px; text-decoration: none; color: var(--accent); background: var(--sage-soft);
+    border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; }
+  nav a:hover { background: var(--blue-soft); }
+  section { margin: 28px 0; }
+  h2 { font-size: 1.2rem; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 2px solid var(--sage); }
+  .intro { color: var(--muted); margin: 6px 0 12px; }
+  .cmd { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--blue);
+    border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+  .cmd p { margin: 8px 2px 2px; }
+  .row { display: flex; gap: 8px; align-items: stretch; }
+  pre { flex: 1; min-width: 0; margin: 0; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 6px; padding: 9px 12px; overflow-x: auto; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+  td code { background: var(--sage-soft); padding: 1px 4px; border-radius: 4px; font-size: 13px; word-break: break-word; }
+  .copy { flex: none; border: 1px solid var(--line); background: var(--sage-soft); color: var(--accent);
+    border-radius: 6px; padding: 0 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .copy:hover { background: var(--blue-soft); }
+  .copy.done { background: var(--sage); color: #fff; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; overflow: hidden; font-size: 14.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { background: var(--sage-soft); }
+  footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top: 1px solid var(--line); margin-top: 30px; }
+  @media (max-width: 600px) { h1 { font-size: 1.4rem; } table { min-width: 560px; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>Troubleshooting Commands</h1>
+  <p>The uv, ruff, pytest, git, gh and llama-server commands used in llm-serving-lab, what each one does, and fixes for errors we have already hit. Every command has a Copy button.</p>
+</div></header>
+<nav><div class="wrap"><a href="#daily">Daily loop</a><a href="#uv">uv</a><a href="#ruff">ruff</a><a href="#pytest">pytest</a><a href="#git">git</a><a href="#gh">gh</a><a href="#server">llama-server and the local model</a><a href="#errors">Errors</a></div></nav>
+<main class="wrap">
+<section id="daily">
+  <h2>Daily loop</h2>
+  <p class="intro">The commands you run on almost every change, in order. Run them from the repo root (~/projects/llm-serving-lab).</p>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff check --fix . &amp;&amp; uv run ruff format .</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Lint and auto-fix what ruff can (import order, unused imports), then reformat the code (spaces, line breaks, quotes). Run before every commit.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest -q</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Run all tests quietly: one dot per passing test, details only for failures.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git status</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show what changed, what is staged and what is untracked (??). Check this before committing so no file is left behind.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git add -A &amp;&amp; git commit -m &quot;Describe the change&quot; &amp;&amp; git push</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Stage every change (including new and deleted files), commit with a message, push to GitHub. The &amp;&amp; chain stops at the first failure.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh run watch</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Follow the CI run for your latest push live in the terminal until it finishes. If it says &quot;no in progress runs&quot;, the run already finished: use gh run list.</p>
+    </div>
+</section>
+<section id="uv">
+  <h2>uv: Python, packages and the virtual environment</h2>
+  <p class="intro">uv manages the Python version, the .venv folder and the locked dependency list (uv.lock). Everything runs through uv run so it uses the project&#x27;s own versions.</p>
+    <div class="cmd">
+      <div class="row"><pre><code>uv --version</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Check uv is installed. If you get &quot;command not found: uv&quot;, install it with brew install uv.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv sync</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Make .venv match pyproject.toml and uv.lock exactly: installs missing packages, removes extra ones. This is the first step in CI. Run it after pulling or switching branches.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run python</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Open a Python shell inside the project environment, so from serving_lab.client import RequestResult works.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run python scripts/one_shot.py</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Run a script with the project environment. Plain python would use a different interpreter that doesn&#x27;t have httpx or your package.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv add httpx</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Add a runtime dependency: updates pyproject.toml and uv.lock, then installs it.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv add --dev pytest</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Add a development-only dependency (tests, linters). It isn&#x27;t installed for people who only use the package.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv remove httpx</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Remove a dependency from pyproject.toml, uv.lock and .venv.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv lock</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Re-resolve and rewrite uv.lock without installing. Use when pyproject.toml was edited by hand.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv lock --upgrade-package httpx</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Upgrade one package to the newest allowed version, leaving everything else pinned.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv tree</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show the dependency tree: what depends on what. Useful when an unexpected package version appears.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv pip list</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>List exactly which packages and versions are installed in .venv.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv python list</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show which Python versions uv can see or has installed.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv sync --reinstall</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Reinstall every package from scratch. Use when .venv seems broken (strange import errors after an upgrade).</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>rm -rf .venv &amp;&amp; uv sync</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Nuclear option: delete the environment and rebuild it. Safe, because .venv is generated and not committed.</p>
+    </div>
+</section>
+<section id="ruff">
+  <h2>ruff: lint and format</h2>
+  <p class="intro">ruff check finds problems (bugs, unused imports, style rules); ruff format rewrites layout. CI runs ruff check, so anything it reports fails the build.</p>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff check .</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Report problems without changing files. Each finding has a code (I001, B905, RUF007) and [*] marks ones ruff can fix itself.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff check --fix .</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Apply all safe automatic fixes, then report what is left for you to fix by hand.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff format .</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Rewrite files into the standard layout: 4-space indents (no tabs), consistent quotes and line breaks.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff format --check .</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Report files that would be reformatted, without changing them. Good to add to CI later.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff rule RUF007</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Explain a rule in full: what it flags, why, and how to fix it. Replace RUF007 with any code from an error.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run ruff check src/serving_lab/client.py</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Check one file only.</p>
+    </div>
+</section>
+<section id="pytest">
+  <h2>pytest: running tests</h2>
+  <p class="intro">Tests live in tests/ and files must be named test_*.py. asyncio_mode = &quot;auto&quot; in pyproject.toml lets async def test_... work without decorators.</p>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest -q</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Run everything, quiet output.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest -v</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Verbose: one line per test with PASSED or FAILED.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest tests/test_result.py</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Run one test file.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest tests/test_result.py::test_no_tokens</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Run one test function.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest -k tpot</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Run only tests whose name contains &quot;tpot&quot;.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest -x</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Stop at the first failure. Handy when one bug breaks many tests.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest --lf</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Re-run only the tests that failed last time.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>uv run pytest -s</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show print() output from tests (normally hidden).</p>
+    </div>
+</section>
+<section id="git">
+  <h2>git: local history</h2>
+  <p class="intro">Everyday git for a single-branch repo. Commands marked careful rewrite history; only use them before you push.</p>
+    <div class="cmd">
+      <div class="row"><pre><code>git status</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>What changed, what is staged, what is untracked.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git diff</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show unstaged line-by-line changes. Add --staged to see what is about to be committed.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git log --oneline -10</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Last 10 commits, one line each.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git log origin/main -1</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>The latest commit GitHub has. If it isn&#x27;t your newest commit, you haven&#x27;t pushed.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git ls-files</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>List every file git tracks. If a file CI needs isn&#x27;t here, it was never committed.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git restore src/serving_lab/client.py</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Throw away uncommitted changes to one file, back to the last commit. Cannot be undone.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git commit --amend --no-edit</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Careful: add staged changes into the previous commit. Only before pushing; after a push it needs a force push.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>git rm --cached path/to/file</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Stop tracking a file but keep it on disk. Use when something (a model, .env) was committed by mistake, then add it to .gitignore.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>grep -n $&#x27;\t&#x27; src/serving_lab/client.py</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Find tab characters in a file (macOS grep needs $&#x27;\t&#x27; to mean a real tab). No output means no tabs.</p>
+    </div>
+</section>
+<section id="gh">
+  <h2>gh: GitHub and CI from the terminal</h2>
+  <p class="intro">gh talks to GitHub as you. Most CI debugging is: list runs, read the failed log, fix locally, push.</p>
+    <div class="cmd">
+      <div class="row"><pre><code>gh auth status</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Check you are logged in and which account gh uses. If not, run gh auth login.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh run list -L 5</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Last 5 CI runs with status: ✓ passed, X failed, * running.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh run view --log-failed</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show the log of the failed steps only. It asks you to pick a run; press Enter for the latest.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh run view $(gh run list -L1 --json databaseId -q &#x27;.[0].databaseId&#x27;) --log-failed | tail -30</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Same, without the picker: the last 30 lines of the latest run&#x27;s failed steps, usually where the real error is.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh run watch</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Follow the current run live until it finishes.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh run rerun --failed</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Re-run only the failed jobs of a run. Only useful for flaky failures (network blips); a real failure needs a code fix.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh workflow list</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>List workflows GitHub knows about. If ci is missing, .github/workflows/ci.yml was never pushed.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh browse</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Open the repo page in your browser.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>gh repo edit --description &quot;...&quot;</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Change the repo&#x27;s About description.</p>
+    </div>
+</section>
+<section id="server">
+  <h2>llama-server and the local model</h2>
+  <p class="intro">Run the server in its own terminal tab and leave it running. Stop it with Ctrl-C.</p>
+    <div class="cmd">
+      <div class="row"><pre><code>llama-server -hf bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M --port 8080</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Start the OpenAI-compatible server with our baseline model. The first run downloads about 4.7 GB. Ready when it prints &quot;listening on http://127.0.0.1:8080&quot;.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>curl -s localhost:8080/health</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Health check. {&quot;status&quot;:&quot;ok&quot;} means the model is loaded and ready.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>curl -N localhost:8080/v1/chat/completions -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Explain a KV cache in 3 sentences&quot;}],&quot;stream&quot;:true}&#x27;</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Stream one chat completion. -N disables curl&#x27;s buffering so you see chunks as they arrive. The last chunk carries the server&#x27;s own timings.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>lsof -i :8080</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show what is using port 8080. If the server won&#x27;t start with &quot;address already in use&quot;, an old one is still running.</p>
+    </div>
+    <div class="cmd">
+      <div class="row"><pre><code>kill $(lsof -t -i :8080)</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Stop whatever process holds port 8080.</p>
+    </div>
+</section>
+<section id="errors">
+  <h2>Errors we have hit</h2>
+  <p class="intro">Symptom, cause and fix. Add a row each time something new bites.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Error or symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>zsh: command not found: uv</code></td><td>uv isn&#x27;t installed (or not on PATH).</td><td><code>brew install uv</code></td></tr>
+      <tr><td><code>error: No `pyproject.toml` found in current directory</code></td><td>You are not in the repo root, or in CI the uv project files were never committed.</td><td><code>cd ~/projects/llm-serving-lab; then git ls-files pyproject.toml uv.lock</code></td></tr>
+      <tr><td><code>I001 Import block is un-sorted or un-formatted</code></td><td>Imports aren&#x27;t grouped and sorted: standard library, then third-party, then your package, with blank lines only between groups.</td><td><code>uv run ruff check --fix .</code></td></tr>
+      <tr><td><code>RUF007 / B905 on zip()</code></td><td>zip() on a list and its own slice. Ruff prefers itertools.pairwise for consecutive pairs.</td><td><code>Use for a, b in pairwise(items)</code></td></tr>
+      <tr><td><code>TabError: inconsistent use of tabs and spaces</code></td><td>Tabs and spaces mixed in one block.</td><td><code>uv run ruff format .</code></td></tr>
+      <tr><td><code>NameError: name &#x27;t_first&#x27; is not defined</code></td><td>Attribute used without self. inside a method.</td><td><code>Write self.t_first</code></td></tr>
+      <tr><td><code>ValueError: mutable default &lt;class &#x27;list&#x27;&gt; for field</code></td><td>A dataclass field defaulted to [] or {}.</td><td><code>field(default_factory=list)</code></td></tr>
+      <tr><td><code>ModuleNotFoundError: No module named &#x27;serving_lab&#x27;</code></td><td>Ran plain python instead of uv run, or the package isn&#x27;t installed in .venv.</td><td><code>uv sync; then uv run python ...</code></td></tr>
+      <tr><td><code>CI passes locally, fails on GitHub</code></td><td>A file exists on your Mac but was never committed, or you pushed before the final ruff run.</td><td><code>git status and git ls-files; re-run the daily loop</code></td></tr>
+      <tr><td><code>found no in progress runs to watch</code></td><td>The CI run already finished.</td><td><code>gh run list -L 3</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+</main>
+<div class="wrap"><footer>
+  To add a command, copy a <code>&lt;div class="cmd"&gt;</code> block into the right section. Run everything from the repo root unless the description says otherwise.
+</footer></div>
+<script>
+  (function () {
+    function fallback(text) {
+      var t = document.createElement('textarea');
+      t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(t);
+    }
+    document.querySelectorAll('.copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var text = btn.parentElement.querySelector('code').textContent;
+        var done = function () {
+          btn.textContent = 'Copied'; btn.classList.add('done');
+          setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1500);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+        } else { fallback(text); done(); }
+      });
+    });
+  })();
+</script>
+</body>
+</html>
