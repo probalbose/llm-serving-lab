@@ -68,8 +68,20 @@
   }
   .ex b { color: var(--accent); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: var(--code); padding: 1px 4px; border-radius: 4px; }
-  .ex code { background: #e4ece6; }
+  .ex code { background: #e4ece6; overflow-wrap: anywhere; }
+  pre.block { margin: 8px 0; background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
+  pre.block code { background: none; padding: 0; font-size: inherit; white-space: pre; }
+  .scroll { overflow-x: auto; margin: 8px 0; }
+  table { border-collapse: collapse; font-size: 13.5px; min-width: 560px; width: 100%; }
+  th, td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--sage-soft); }
+  td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
   .see { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+  .refs div { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--sage); border-radius: 8px; padding: 12px 14px; }
+  .refs h3 { margin: 0 0 6px; font-size: 1rem; }
+  .refs ul { margin: 0; padding-left: 18px; }
+  .refs a { color: var(--accent); }
   .hidden { display: none; }
   #empty { color: var(--muted); padding: 20px 0; }
   footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top: 1px solid var(--line); margin-top: 30px; }
@@ -88,6 +100,8 @@
   <div class="wrap">
     <input type="search" id="q" placeholder="Filter terms, e.g. kv, p99, batch" aria-label="Filter terms">
     <nav>
+      <a href="#refs">Docs</a>
+      <a href="#handson">Hands-on</a>
       <a href="#metrics">Metrics</a>
       <a href="#phases">Inference</a>
       <a href="#memory">Memory</a>
@@ -105,7 +119,103 @@
 <main class="wrap">
 <p id="empty" class="hidden">No term matches that filter.</p>
 
+<section id="refs" class="refs-section">
+<h2>Official documentation</h2>
+<div class="refs">
+  <div><h3>OpenAI API (the format everyone copies)</h3><ul>
+    <li><a href="https://platform.openai.com/docs/api-reference/chat/create" target="_blank" rel="noopener">Chat completions: request and response</a></li>
+    <li><a href="https://platform.openai.com/docs/api-reference/streaming" target="_blank" rel="noopener">Streaming responses</a></li>
+  </ul></div>
+  <div><h3>vLLM</h3><ul>
+    <li><a href="https://docs.vllm.ai/en/latest/" target="_blank" rel="noopener">Documentation home</a></li>
+    <li><a href="https://docs.vllm.ai/en/latest/serving/online_serving/" target="_blank" rel="noopener">Online serving (OpenAI-compatible server)</a></li>
+    <li><a href="https://docs.vllm.ai/en/stable/usage/metrics.html" target="_blank" rel="noopener">Production metrics (Prometheus)</a></li>
+  </ul></div>
+  <div><h3>llama.cpp</h3><ul>
+    <li><a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener">Repository and README</a></li>
+    <li><a href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server" target="_blank" rel="noopener">llama-server docs (endpoints, flags, slots)</a></li>
+  </ul></div>
+  <div><h3>Also useful</h3><ul>
+    <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events" target="_blank" rel="noopener">Server-Sent Events (MDN)</a></li>
+    <li><a href="https://github.com/ml-explore/mlx-lm" target="_blank" rel="noopener">MLX-LM</a></li>
+    <li><a href="https://www.python-httpx.org/async/" target="_blank" rel="noopener">httpx async client</a></li>
+  </ul></div>
+</div>
+</section>
+
 <!-- ============================================================ -->
+<section id="handson">
+<h2>Hands-on: tokens and the stream</h2>
+
+<article>
+  <h3><span class="short">1. start</span><span class="full">Start the local server (Qwen2.5-7B, llama-server)</span></h3>
+  <p class="what">Run this in its own terminal tab and leave it open. The first run downloads about 4.7 GB; later runs load from the cache. It is ready when it prints <code>server is listening on http://127.0.0.1:8080</code>. If a curl below says "Failed to connect to localhost port 8080", this is not running.</p>
+  <pre class="block"><code>llama-server -hf bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M --port 8080</code></pre>
+  <p class="what">Check it from another tab. <code>-i</code> prints the HTTP status, so a failure is visible instead of silent:</p>
+  <pre class="block"><code>curl -i localhost:8080/health</code></pre>
+  <div class="ex"><b>Expect:</b> <code>HTTP/1.1 200 OK</code> and <code>{&quot;status&quot;:&quot;ok&quot;}</code>.</div>
+</article>
+
+<article>
+  <h3><span class="short">2. tokenize</span><span class="full">See how text becomes tokens</span></h3>
+  <p class="what">A token is a piece from the model's fixed vocabulary, not a word or phrase you choose. Common words are one token, rare words split into several, and a leading space is part of the token. On average a token is about 0.75 English words. <code>/tokenize</code> shows the split for this model's tokenizer:</p>
+  <pre class="block"><code>curl -s localhost:8080/tokenize -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;content&quot;:&quot;capital of the jobs tokenization&quot;,&quot;with_pieces&quot;:true}&#x27;</code></pre>
+  <div class="ex"><b>Measured output (M4 Max, Qwen2.5-7B Q4_K_M):</b> five words became six tokens. "tokenization" split into " token" + "ization". "capital" has no leading space only because it starts the text; mid-sentence it would be " capital", a different id.</div>
+  <pre class="block"><code>{&quot;tokens&quot;:[{&quot;id&quot;:65063,&quot;piece&quot;:&quot;capital&quot;},{&quot;id&quot;:315,&quot;piece&quot;:&quot; of&quot;},{&quot;id&quot;:279,&quot;piece&quot;:&quot; the&quot;},
+           {&quot;id&quot;:6887,&quot;piece&quot;:&quot; jobs&quot;},{&quot;id&quot;:3950,&quot;piece&quot;:&quot; token&quot;},{&quot;id&quot;:2022,&quot;piece&quot;:&quot;ization&quot;}]}</code></pre>
+</article>
+
+<article>
+  <h3><span class="short">3. stream</span><span class="full">Watch one SSE (Server-Sent Event) line arrive per token</span></h3>
+  <p class="what">You can only stream what the model writes, so ask it to repeat the phrase. <code>"stream":true</code> asks for Server-Sent Events, <code>-N</code> turns off curl's buffering so lines print as they arrive, and <code>"temperature":0</code> makes the answer repeatable.</p>
+  <pre class="block"><code>curl -N localhost:8080/v1/chat/completions -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Repeat exactly, nothing else: capital of the jobs tokenization&quot;}],&quot;stream&quot;:true,&quot;temperature&quot;:0}&#x27;</code></pre>
+  <div class="ex"><b>Measured output</b> (repeated fields <code>created</code>, <code>id</code>, <code>model</code>, <code>object</code> and <code>system_fingerprint</code> shortened to <code>...</code>):</div>
+  <pre class="block"><code>data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;role&quot;:&quot;assistant&quot;,&quot;content&quot;:null}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;content&quot;:&quot;capital&quot;}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;content&quot;:&quot; of&quot;}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;content&quot;:&quot; the&quot;}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;content&quot;:&quot; jobs&quot;}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;content&quot;:&quot; token&quot;}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:null,&quot;index&quot;:0,&quot;delta&quot;:{&quot;content&quot;:&quot;ization&quot;}}],...}
+
+data: {&quot;choices&quot;:[{&quot;finish_reason&quot;:&quot;stop&quot;,&quot;index&quot;:0,&quot;delta&quot;:{}}],...,
+       &quot;timings&quot;:{&quot;prompt_n&quot;:41,&quot;prompt_ms&quot;:125.6,&quot;predicted_n&quot;:7,&quot;predicted_per_token_ms&quot;:14.98,...}}
+
+data: [DONE]</code></pre>
+</article>
+
+<article>
+  <h3><span class="short">4. mapping</span><span class="full">How each line relates to a token and to our client</span></h3>
+  <p class="what">The model generates one token per decode step, and the server writes one <code>data: {...}</code> line for it, followed by a blank line. The JSON shape is the same every time; only <code>choices[0].delta.content</code> changes. Our client waits for each line, timestamps it with <code>perf_counter()</code>, and calls <code>parse_sse_line</code>. A non-None result is a token: its time goes into <code>t_tokens</code>, and the first one is also <code>t_first</code>.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>SSE line carries</th><th>Meaning</th><th>parse_sse_line</th><th>RequestResult</th></tr></thead>
+    <tbody>
+      <tr><td>delta.role = assistant, content null</td><td>no token: the reply is starting</td><td>None</td><td>not counted</td></tr>
+      <tr><td>delta.content = &quot;capital&quot;</td><td>token 1 (id 65063)</td><td>&quot;capital&quot;</td><td>t_first, t_tokens[0]</td></tr>
+      <tr><td>delta.content = &quot; of&quot;</td><td>token 2 (id 315)</td><td>&quot; of&quot;</td><td>t_tokens[1]</td></tr>
+      <tr><td>delta.content = &quot; the&quot;</td><td>token 3 (id 279)</td><td>&quot; the&quot;</td><td>t_tokens[2]</td></tr>
+      <tr><td>delta.content = &quot; jobs&quot;</td><td>token 4 (id 6887)</td><td>&quot; jobs&quot;</td><td>t_tokens[3]</td></tr>
+      <tr><td>delta.content = &quot; token&quot;</td><td>token 5 (id 3950)</td><td>&quot; token&quot;</td><td>t_tokens[4]</td></tr>
+      <tr><td>delta.content = &quot;ization&quot;</td><td>token 6 (id 2022)</td><td>&quot;ization&quot;</td><td>t_tokens[5]</td></tr>
+      <tr><td>delta = {}, finish_reason stop</td><td>token 7 is end-of-turn, not sent as text</td><td>None</td><td>not counted</td></tr>
+      <tr><td>literal [DONE]</td><td>stream finished</td><td>None</td><td>stop reading</td></tr>
+    </tbody>
+  </table></div>
+  <div class="ex"><b>Three things this run shows:</b><br>
+  1. <code>predicted_n</code> is 7 but only 6 lines carry text. The 7th token is Qwen's end-of-turn token (<code>&lt;|im_end|&gt;</code>), which the server turns into <code>finish_reason: "stop"</code>. Chunks and tokens can differ, so later we compare against <code>usage.completion_tokens</code>.<br>
+  2. <code>prompt_n</code> is 41 for a ten-word message, because the chat template adds role markers and Qwen's default system prompt. Prefilling them took about 126 ms (<code>prompt_ms</code>), which is most of the TTFT.<br>
+  3. <code>predicted_per_token_ms</code> ≈ 15 ms is the server's own TPOT, which our ITLs should roughly match at concurrency 1.</div>
+  <p class="see">See also: SSE, chunk, delta, choice, TTFT, ITL, prefill, decode.</p>
+</article>
+</section>
+
+
 <section id="metrics">
 <h2>Latency and throughput metrics</h2>
 
@@ -527,6 +637,18 @@
   <h3><span class="short">Chunk</span><span class="full">Stream chunk (SSE event)</span></h3>
   <p class="what">One <code>data:</code> event in the stream. It usually carries one token's text, but servers may merge several tokens or send empty chunks, so chunk count is not token count.</p>
   <div class="ex"><b>Example:</b> 71 tokens generated may arrive as 71 chunks on llama.cpp but fewer on a server that batches output. Use <code>usage.completion_tokens</code> for the true count.</div>
+</article>
+
+<article>
+  <h3><span class="short">choices</span><span class="full">Choices (completion alternatives)</span></h3>
+  <p class="what">The list of candidate answers in a response. The <code>n</code> request parameter asks for several independent completions of the same prompt, so the field is always a list, each item with an <code>index</code>. With the default n = 1 there is exactly one, read as <code>choices[0]</code>.</p>
+  <div class="ex"><b>Example:</b> <code>"n": 3</code> returns choices with index 0, 1 and 2. The final usage chunk in a stream has <code>"choices": []</code>, which is why the parser uses <code>.get("choices") or []</code>.</div>
+</article>
+
+<article>
+  <h3><span class="short">delta</span><span class="full">Delta (streamed increment)</span></h3>
+  <p class="what">In a streaming chunk, only the new part of the message since the previous chunk. Concatenating every delta's <code>content</code> gives the full answer. Non-streaming responses carry the whole text in <code>message</code> instead.</p>
+  <div class="ex"><b>Example:</b> deltas <code>{"role":"assistant"}</code>, <code>{"content":"A"}</code>, <code>{"content":" KV"}</code>, <code>{}</code> build the text "A KV". Only the two with content are tokens.</div>
 </article>
 
 <article>

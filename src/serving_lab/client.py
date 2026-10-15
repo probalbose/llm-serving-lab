@@ -7,6 +7,7 @@ TPOT = time per output token (after the first).
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from itertools import pairwise
 
@@ -47,3 +48,21 @@ class RequestResult:
         if len(self.t_tokens) < 2:
             return None
         return (self.t_tokens[-1] - self.t_first) / (len(self.t_tokens) - 1)
+
+
+def parse_sse_line(line: str) -> str | None:
+    """Return the token text in one SSE (Server-Sent Events) line, or None if it carries none.
+
+    None for blank lines, comments, role-only and final empty-delta chunks.
+    Raises json.JSONDecodeError on a malformed data line.
+    """
+    if not line.startswith("data: "):
+        return None
+    payload = line.removeprefix("data: ")
+    if payload == "[DONE]":
+        return None
+    chunk = json.loads(payload)
+    choices = chunk.get("choices") or []
+    if not choices:
+        return None
+    return choices[0].get("delta", {}).get("content") or None

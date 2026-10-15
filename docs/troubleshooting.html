@@ -292,6 +292,10 @@
       <p>Start the OpenAI-compatible server with our baseline model. The first run downloads about 4.7 GB. Ready when it prints &quot;listening on http://127.0.0.1:8080&quot;.</p>
     </div>
     <div class="cmd">
+      <div class="row"><pre><code>curl -s localhost:8080/tokenize -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;content&quot;:&quot;capital of the jobs tokenization&quot;,&quot;with_pieces&quot;:true}&#x27;</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      <p>Show how the model&#x27;s tokenizer splits text: each token id with its text piece. One token = one SSE line when streaming.</p>
+    </div>
+    <div class="cmd">
       <div class="row"><pre><code>curl -s localhost:8080/health</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
       <p>Health check. {&quot;status&quot;:&quot;ok&quot;} means the model is loaded and ready.</p>
     </div>
@@ -322,8 +326,12 @@
       <tr><td><code>NameError: name &#x27;t_first&#x27; is not defined</code></td><td>Attribute used without self. inside a method.</td><td><code>Write self.t_first</code></td></tr>
       <tr><td><code>ValueError: mutable default &lt;class &#x27;list&#x27;&gt; for field</code></td><td>A dataclass field defaulted to [] or {}.</td><td><code>field(default_factory=list)</code></td></tr>
       <tr><td><code>ModuleNotFoundError: No module named &#x27;serving_lab&#x27;</code></td><td>Ran plain python instead of uv run, or the package isn&#x27;t installed in .venv.</td><td><code>uv sync; then uv run python ...</code></td></tr>
+      <tr><td><code>TypeError: pairwise expected 1 argument, got 2</code></td><td>pairwise() was given two lists like zip(). It pairs neighbours inside ONE iterable.</td><td><code>pairwise(items)</code></td></tr>
+      <tr><td><code>TypeError: __init__() missing 1 required positional argument: &#x27;t_send&#x27;</code></td><td>A dataclass field without a default was left out when building the object.</td><td><code>Pass it: RequestResult(t_send=0.0, ...)</code></td></tr>
+      <tr><td><code>NameError inside a call like f(x==1)</code></td><td>== is a comparison, so Python tries to read a variable x. Keyword arguments use a single =.</td><td><code>f(x=1)</code></td></tr>
       <tr><td><code>CI passes locally, fails on GitHub</code></td><td>A file exists on your Mac but was never committed, or you pushed before the final ruff run.</td><td><code>git status and git ls-files; re-run the daily loop</code></td></tr>
       <tr><td><code>found no in progress runs to watch</code></td><td>The CI run already finished.</td><td><code>gh run list -L 3</code></td></tr>
+      <tr><td><code>curl: (7) Failed to connect to localhost port 8080</code></td><td>llama-server isn&#x27;t running (closed terminal, reboot) or is on another port. curl -s hides this error and prints nothing.</td><td><code>Start llama-server again in its own tab; drop -s and add -i to see errors</code></td></tr>
     </tbody>
   </table></div>
 </section>
