@@ -33,6 +33,7 @@ All servers are driven through the same OpenAI-compatible streaming API, so one 
 - [ ] **Stage 2** Open-loop load generator (Poisson, bursty, long-prompt traffic), avoiding coordinated omission
 - [ ] **Stage 3** Analysis: percentiles, goodput, latency-versus-load knee, Little's law check
 - [ ] **Stage 4** vLLM sweeps over `max_num_seqs`, prompt length, prefix caching, quantisation and speculative decoding
+  - [ ] *Optional:* tensor parallelism on a 2-GPU node (`--tensor-parallel-size 2`) versus 1 GPU: TTFT, ITL and throughput, and how much inter-GPU communication costs
 - [ ] **Stage 5** Prometheus and GPU (DCGM) metrics in Grafana, correlated with client-side latency
 
 ## Quick start

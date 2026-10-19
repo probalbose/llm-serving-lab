@@ -69,6 +69,7 @@
   .ex b { color: var(--accent); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: var(--code); padding: 1px 4px; border-radius: 4px; }
   .ex code { background: #e4ece6; overflow-wrap: anywhere; }
+  .what code { overflow-wrap: anywhere; }
   pre.block { margin: 8px 0; background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
   pre.block code { background: none; padding: 0; font-size: inherit; white-space: pre; }
   .scroll { overflow-x: auto; margin: 8px 0; }
@@ -101,6 +102,7 @@
     <input type="search" id="q" placeholder="Filter terms, e.g. kv, p99, batch" aria-label="Filter terms">
     <nav>
       <a href="#refs">Docs</a>
+      <a href="#project">This project</a>
       <a href="#handson">Hands-on</a>
       <a href="#metrics">Metrics</a>
       <a href="#phases">Inference</a>
@@ -144,6 +146,85 @@
 </section>
 
 <!-- ============================================================ -->
+<section id="project">
+<h2>This project: client, server and our components</h2>
+
+<article>
+  <h3><span class="short">overview</span><span class="full">Who does what</span></h3>
+  <p class="what">Two separate programs talk over HTTP. The <b>server</b> runs the model; the <b>client</b> is our Python code that sends requests and measures timing. Everything we write is on the client side.</p>
+  <pre class="block"><code>  your Mac (later: client on the Mac or a VM, server on a cloud GPU)
+
+  +---------------------------------+          HTTP POST           +------------------------------+
+  |  CLIENT  (our Python code)      |  --------------------------&gt; |  SERVER  (llama-server)      |
+  |                                 |   localhost:8080             |  port 8080, holds the model  |
+  |  scripts/one_shot.py  (Stage 1) |   /v1/chat/completions       |                              |
+  |  load generator       (Stage 2) |                              |  tokenize -&gt; prefill -&gt;      |
+  |    -&gt; stream_chat()             |  &lt;-------------------------- |  decode one token at a time  |
+  |       -&gt; parse_sse_line()       |   SSE stream: one data line  |  -&gt; detokenize -&gt; SSE line   |
+  |       -&gt; RequestResult          |   per token, then [DONE]     |                              |
+  +---------------------------------+                              +------------------------------+
+
+  In tests, httpx.MockTransport replaces the server: no model, no network, known timings.</code></pre>
+</article>
+
+<article>
+  <h3><span class="short">Server</span><span class="full">Inference server: llama-server (later vLLM)</span></h3>
+  <p class="what">The separate process that holds the model in memory and does all the model work: chat template, tokenizing, prefill, decode, detokenizing, and writing the SSE stream. It listens on a port and answers HTTP requests from any client. We don't write it; we start it, send it requests and measure it.</p>
+  <div class="ex"><b>Example:</b> <code>llama-server -hf bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M --port 8080</code> runs in its own terminal tab. In Stage 4 the server becomes vLLM on a rented cloud GPU, and the client code stays the same because both speak the OpenAI-compatible API.</div>
+</article>
+<article>
+  <h3><span class="short">Client</span><span class="full">Our measuring client: serving_lab.client</span></h3>
+  <p class="what">Our Python code. It plays the role of users: it sends chat requests to the server and records when every token comes back. It never sees the model, token ids or vectors, only HTTP, SSE lines and timestamps. That outside view is the point: it measures what a real user would experience, including queueing and network time the server's own metrics miss.</p>
+  <div class="ex"><b>Example:</b> <code>stream_chat()</code> sends one request and returns a <code>RequestResult</code>. Client and server are two processes on the same Mac today, talking over <code>localhost</code>, but they would work the same on two machines.</div>
+</article>
+<article>
+  <h3><span class="short">localhost:8080</span><span class="full">Endpoint address</span></h3>
+  <p class="what"><code>localhost</code> means this same machine, and <code>8080</code> is the port llama-server listens on. The full URL the client posts to is <code>http://localhost:8080/v1/chat/completions</code>.</p>
+  <div class="ex"><b>Example:</b> "Failed to connect to localhost port 8080" means no server process is listening there, usually because the server tab was closed.</div>
+</article>
+<article>
+  <h3><span class="short">httpx.AsyncClient</span><span class="full">HTTP client library object</span></h3>
+  <p class="what">The httpx object that actually opens connections and sends HTTP. It keeps a pool of open connections so many requests can reuse them. It is a "client" in the HTTP sense; our whole program is the client in the project sense. We create one and pass it into <code>stream_chat</code>, so a load test shares one connection pool.</p>
+  <div class="ex"><b>Example:</b> <code>async with httpx.AsyncClient(timeout=60) as client:</code> then <code>await stream_chat(client, url, messages)</code>.</div>
+</article>
+<article>
+  <h3><span class="short">stream_chat</span><span class="full">One streaming request (client side)</span></h3>
+  <p class="what">Our async function that sends one chat request with <code>stream: true</code>, reads the SSE lines as they arrive, timestamps each one with <code>perf_counter()</code> before parsing, and returns a <code>RequestResult</code>. It never raises: HTTP errors, timeouts and bad JSON go into <code>result.error</code>.</p>
+  <div class="ex"><b>Example:</b> A 6-token reply produces 6 entries in <code>t_tokens</code> and about 8 or 9 in <code>n_chunks</code>, because the role, finish and usage chunks count as chunks but carry no text.</div>
+</article>
+<article>
+  <h3><span class="short">parse_sse_line</span><span class="full">SSE line parser</span></h3>
+  <p class="what">Our pure function that turns one SSE line into the token text it carries, or None. None covers blank separators, the role-only first chunk, the empty finish chunk, the usage chunk and <code>[DONE]</code>. It has no I/O and no timing, so it is easy to test on its own.</p>
+  <div class="ex"><b>Example:</b> A line carrying <code>{"delta":{"content":" of"}}</code> returns <code>" of"</code>; <code>[DONE]</code> returns None.</div>
+</article>
+<article>
+  <h3><span class="short">RequestResult</span><span class="full">Per-request record</span></h3>
+  <p class="what">Our dataclass holding what happened to one request: raw timestamps (<code>t_send</code>, <code>t_first</code>, <code>t_tokens</code>), <code>n_chunks</code>, HTTP <code>status</code> and <code>error</code>. The metrics TTFT, ITL, TPOT and e2e are computed from the timestamps as properties, so raw data is never thrown away.</p>
+  <div class="ex"><b>Example:</b> <code>t_send=0.000, t_tokens=[0.130, 0.145, 0.160]</code> gives TTFT 130 ms, ITL [15, 15] ms.</div>
+</article>
+<article>
+  <h3><span class="short">event loop</span><span class="full">asyncio event loop</span></h3>
+  <p class="what">The scheduler inside our client process that runs many coroutines on one thread. Each <code>stream_chat</code> call pauses at <code>await</code> points while it waits for the server, and the loop resumes whichever request has new data. Blocking work in one coroutine delays every other one, which would inflate the latencies we measure.</p>
+  <div class="ex"><b>Example:</b> <code>await asyncio.gather(*(stream_chat(client, url, msgs) for _ in range(16)))</code> runs 16 requests concurrently on one loop.</div>
+</article>
+<article>
+  <h3><span class="short">MockTransport</span><span class="full">Fake server for tests (httpx.MockTransport)</span></h3>
+  <p class="what">An httpx feature that replaces the network: instead of sending the request to a real server, httpx calls our handler function, which returns a scripted response. Our handler streams SSE lines with known sleeps between them, so tests can check timings and edge cases without a model, and CI stays fast.</p>
+  <div class="ex"><b>Example:</b> A handler that sends 5 content lines 20 ms apart lets a test assert every ITL is about 20 ms.</div>
+</article>
+<article>
+  <h3><span class="short">one_shot.py</span><span class="full">Single-request script (end of Stage 1)</span></h3>
+  <p class="what">A small script in <code>scripts/</code> that calls <code>stream_chat</code> once against the real llama-server and prints TTFT, mean ITL, chunk count and e2e. It is the first time our client meets the real server.</p>
+  <div class="ex"><b>Example:</b> <code>uv run python scripts/one_shot.py</code> with llama-server running in another tab.</div>
+</article>
+<article>
+  <h3><span class="short">load generator</span><span class="full">Open-loop load generator (Stage 2)</span></h3>
+  <p class="what">The Stage 2 client that fires many <code>stream_chat</code> calls on a schedule (Poisson, bursty or long-prompt traffic) regardless of whether earlier requests have finished. That open-loop design avoids coordinated omission, so the measured latencies include the queueing a real overloaded server would cause.</p>
+  <div class="ex"><b>Example:</b> Send requests at 2 per second for 5 minutes, then compare p50 and p99 TTFT as the rate rises past the server's 4 slots.</div>
+</article>
+</section>
+
+
 <section id="handson">
 <h2>Hands-on: tokens and the stream</h2>
 

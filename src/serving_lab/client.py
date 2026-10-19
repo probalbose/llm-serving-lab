@@ -8,8 +8,11 @@ TPOT = time per output token (after the first).
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from itertools import pairwise
+
+import httpx
 
 
 @dataclass
@@ -66,3 +69,41 @@ def parse_sse_line(line: str) -> str | None:
     if not choices:
         return None
     return choices[0].get("delta", {}).get("content") or None
+
+
+async def stream_chat(
+    client: httpx.AsyncClient,
+    url: str,
+    messages: list[dict],
+    max_tokens: int = 256,
+) -> RequestResult:
+    """Send one streaming chat request and record when each token arrived.
+    Never raises: HTTP errors, timeouts and bad JSON go into result.error."""
+    body = {
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    result = RequestResult(t_send=time.perf_counter())
+    try:
+        async with client.stream("POST", url, json=body) as response:
+            result.status = response.status_code
+            if response.status_code != 200:
+                result.error = f"HTTP {response.status_code}"
+                return result
+            async for line in response.aiter_lines():
+                t = time.perf_counter()
+                if line.endswith("[DONE]"):
+                    break
+                if not line.strip():
+                    continue
+                result.n_chunks += 1
+                if parse_sse_line is None:
+                    continue
+                if result.t_first is None:
+                    result.t_first = t
+                result.t_tokens.append(t)
+    except (httpx.HTTPError, json.JSONDecodeError) as e:
+        result.error = f"{type(e).__name__}:{e}"
+    return result
